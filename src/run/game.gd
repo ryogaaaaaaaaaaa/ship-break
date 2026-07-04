@@ -7,6 +7,7 @@ const PlayerScript := preload("res://src/actors/player/player.gd")
 const ChaserScript := preload("res://src/actors/enemies/chaser.gd")
 const ProjectileScript := preload("res://src/combat/projectile.gd")
 const MobileControlsScript := preload("res://src/ui/mobile_controls.gd")
+const DangerOverlayScript := preload("res://src/ui/danger_overlay.gd")
 const FeedbackFxScript := preload("res://src/fx/feedback_fx.gd")
 const SoundBankScript := preload("res://src/fx/sound_bank.gd")
 
@@ -36,8 +37,10 @@ var _status_label: Label
 var _message_label: Label
 var _warning_label: Label
 var _mobile_controls: Variant
+var _danger_overlay: Variant
 var _feedback_fx: Variant
 var _sound_bank: Variant
+var _danger_sound_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -63,6 +66,7 @@ func start_run(seed: int = default_seed) -> void:
 	_elapsed_seconds = 0.0
 	_spawn_timer = 0.0
 	_kill_count = 0
+	_danger_sound_timer = 0.0
 	_status = RunStatus.PLAYING
 	_run_duration_seconds = _snapshot.get_float("run.duration_seconds", 60.0)
 	_wall_rects.clear()
@@ -111,6 +115,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_elapsed_seconds += delta
+	_danger_sound_timer = maxf(0.0, _danger_sound_timer - delta)
 	_spawn_timer -= delta
 	if _spawn_timer <= 0.0:
 		_spawn_chaser()
@@ -119,6 +124,7 @@ func _physics_process(delta: float) -> void:
 	_resolve_projectile_enemy_hits()
 	_resolve_projectile_wall_hits()
 	_resolve_enemy_contact()
+	_update_danger_feedback()
 	_check_success()
 	_update_ui()
 	queue_redraw()
@@ -260,6 +266,8 @@ func _on_player_died() -> void:
 	_status = RunStatus.LOST
 	if _sound_bank != null:
 		_sound_bank.play("lost")
+	if _danger_overlay != null:
+		_danger_overlay.set_danger_intensity(0.0)
 	_update_ui()
 
 
@@ -345,6 +353,29 @@ func get_anomaly_intensity() -> float:
 	return clampf((_elapsed_seconds - warning_start) / maxf(_run_duration_seconds - warning_start, 1.0), 0.0, 1.0)
 
 
+func get_danger_intensity() -> float:
+	if _player == null or not is_instance_valid(_player):
+		return 0.0
+	var nearest_distance: float = INF
+	var chasers: Array[Node] = get_tree().get_nodes_in_group("chaser")
+	for chaser_node in chasers:
+		if chaser_node == null or not is_instance_valid(chaser_node):
+			continue
+		nearest_distance = minf(nearest_distance, _player.global_position.distance_to(chaser_node.global_position))
+	if nearest_distance == INF:
+		return 0.0
+	return 1.0 - clampf((nearest_distance - 82.0) / 230.0, 0.0, 1.0)
+
+
+func _update_danger_feedback() -> void:
+	var danger_intensity: float = get_danger_intensity()
+	if _danger_overlay != null:
+		_danger_overlay.set_danger_intensity(danger_intensity)
+	if _sound_bank != null and danger_intensity >= 0.72 and _danger_sound_timer <= 0.0:
+		_sound_bank.play("danger")
+		_danger_sound_timer = lerpf(0.58, 0.24, danger_intensity)
+
+
 func _draw_instability_lines(anomaly: float) -> void:
 	var line_count: int = 5
 	for index in range(line_count):
@@ -359,6 +390,8 @@ func _check_success() -> void:
 		_status = RunStatus.WON
 		if _sound_bank != null:
 			_sound_bank.play("win")
+		if _danger_overlay != null:
+			_danger_overlay.set_danger_intensity(0.0)
 		_update_ui()
 
 
@@ -391,6 +424,10 @@ func _create_ui() -> void:
 	_mobile_controls = MobileControlsScript.new()
 	_mobile_controls.name = "MobileControls"
 	_ui_layer.add_child(_mobile_controls)
+
+	_danger_overlay = DangerOverlayScript.new()
+	_danger_overlay.name = "DangerOverlay"
+	_ui_layer.add_child(_danger_overlay)
 
 
 func _create_audio() -> void:

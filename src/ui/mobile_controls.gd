@@ -10,6 +10,7 @@ var dash_just_pressed: bool = false
 var _left_touch_id: int = -1
 var _right_touch_id: int = -1
 var _dash_touch_id: int = -1
+var _aim_strength: float = 0.0
 var _left_origin: Vector2 = Vector2.ZERO
 var _left_current: Vector2 = Vector2.ZERO
 var _right_origin: Vector2 = Vector2.ZERO
@@ -34,6 +35,10 @@ func _process(_delta: float) -> void:
 
 func has_aim_input() -> bool:
 	return _right_touch_id != -1
+
+
+func get_aim_strength() -> float:
+	return _aim_strength
 
 
 func is_active() -> bool:
@@ -74,6 +79,7 @@ func _handle_screen_touch(event: InputEventScreenTouch) -> void:
 		if event.index == _right_touch_id:
 			_right_touch_id = -1
 			shoot_pressed = false
+			_aim_strength = 0.0
 		if event.index == _dash_touch_id:
 			_dash_touch_id = -1
 			dash_pressed = false
@@ -87,6 +93,7 @@ func _handle_screen_drag(event: InputEventScreenDrag) -> void:
 	elif event.index == _right_touch_id:
 		_right_current = event.position
 		var aim_delta: Vector2 = _right_current - _right_origin
+		_aim_strength = clampf(aim_delta.length() / 92.0, 0.0, 1.0)
 		if aim_delta.length() > 12.0:
 			aim_direction = aim_delta.normalized()
 		shoot_pressed = true
@@ -122,5 +129,10 @@ func _draw() -> void:
 	var aim_center := Vector2(viewport_size.x - 230.0, viewport_size.y - 130.0)
 	if _right_touch_id != -1:
 		aim_center = _right_origin
-	draw_circle(aim_center, 46.0, Color(0.22, 0.16, 0.08, 0.22))
-	draw_line(aim_center, aim_center + aim_direction * 48.0, Color(1.0, 0.84, 0.28, 0.58), 4.0)
+	var aim_radius: float = 46.0 + _aim_strength * 14.0
+	var aim_alpha: float = 0.30 + _aim_strength * 0.30
+	draw_circle(aim_center, aim_radius, Color(0.22, 0.16, 0.08, 0.22 + _aim_strength * 0.10))
+	draw_arc(aim_center, aim_radius, 0.0, TAU, 36, Color(1.0, 0.84, 0.28, aim_alpha), 3.0)
+	draw_line(aim_center, aim_center + aim_direction * (52.0 + _aim_strength * 48.0), Color(1.0, 0.84, 0.28, 0.58 + _aim_strength * 0.22), 4.0 + _aim_strength * 2.0)
+	if _right_touch_id != -1:
+		draw_circle(aim_center + aim_direction * (60.0 + _aim_strength * 44.0), 8.0 + _aim_strength * 5.0, Color(1.0, 0.88, 0.32, 0.35 + _aim_strength * 0.35))

@@ -134,6 +134,10 @@ func _draw() -> void:
 	var aim_length: float = 34.0
 	var aim_width: float = 4.0
 	var aim_color := Color(0.72, 1.0, 1.0)
+	if mobile_controls != null and mobile_controls.has_aim_input():
+		aim_length = 52.0 + mobile_controls.get_aim_strength() * 26.0
+		aim_width = 5.0
+		aim_color = Color(1.0, 0.9, 0.36)
 	if _shot_feedback_remaining > 0.0:
 		aim_length = 46.0
 		aim_width = 6.0
