@@ -16,6 +16,8 @@ func run(context) -> void:
 	context.assert_true(first_root.has_node("FeedbackFx"), "起動時に視覚フィードバック層が作られる")
 	context.assert_true(game.has_node("SoundBank"), "起動時に音フィードバック層が作られる")
 	context.assert_true(game.get_node("Hud").has_node("DangerOverlay"), "起動時に危険表示レイヤーが作られる")
+	context.assert_true(game.get_node("Hud").has_node("DebugInterruptionOverlay"), "起動時にデバッグ割り込みレイヤーが作られる")
+	context.assert_true(not game.is_debug_interruption_showing(), "起動時はデバッグ割り込みレイヤーを隠す")
 
 	game.start_run(777)
 	await context.process_frame

@@ -8,6 +8,7 @@ const ChaserScript := preload("res://src/actors/enemies/chaser.gd")
 const ProjectileScript := preload("res://src/combat/projectile.gd")
 const MobileControlsScript := preload("res://src/ui/mobile_controls.gd")
 const DangerOverlayScript := preload("res://src/ui/danger_overlay.gd")
+const DebugInterruptionOverlayScript := preload("res://src/ui/debug_interruption_overlay.gd")
 const FeedbackFxScript := preload("res://src/fx/feedback_fx.gd")
 const SoundBankScript := preload("res://src/fx/sound_bank.gd")
 
@@ -38,6 +39,7 @@ var _message_label: Label
 var _warning_label: Label
 var _mobile_controls: Variant
 var _danger_overlay: Variant
+var _debug_overlay: Variant
 var _feedback_fx: Variant
 var _sound_bank: Variant
 var _danger_sound_timer: float = 0.0
@@ -68,6 +70,10 @@ func start_run(seed: int = default_seed) -> void:
 	_kill_count = 0
 	_danger_sound_timer = 0.0
 	_status = RunStatus.PLAYING
+	if _mobile_controls != null:
+		_mobile_controls.reset()
+	if _debug_overlay != null:
+		_debug_overlay.hide_interruption()
 	_run_duration_seconds = _snapshot.get_float("run.duration_seconds", 60.0)
 	_wall_rects.clear()
 	_spawn_points = [
@@ -104,6 +110,17 @@ func count_session_children() -> int:
 	if _session_root == null:
 		return 0
 	return _session_root.get_child_count()
+
+
+func is_debug_interruption_showing() -> bool:
+	return _debug_overlay != null and _debug_overlay.is_showing()
+
+
+func _input(event: InputEvent) -> void:
+	if _is_end_restart_input(event):
+		start_run(default_seed)
+		_restart_was_pressed = Input.is_key_pressed(KEY_R)
+		get_viewport().set_input_as_handled()
 
 
 func _physics_process(delta: float) -> void:
@@ -392,6 +409,8 @@ func _check_success() -> void:
 			_sound_bank.play("win")
 		if _danger_overlay != null:
 			_danger_overlay.set_danger_intensity(0.0)
+		if _debug_overlay != null:
+			_debug_overlay.show_interruption(_elapsed_seconds, _kill_count, default_seed)
 		_update_ui()
 
 
@@ -400,6 +419,23 @@ func _handle_restart_input() -> void:
 	if restart_pressed and not _restart_was_pressed:
 		start_run(default_seed)
 	_restart_was_pressed = restart_pressed
+
+
+func _is_end_restart_input(event: InputEvent) -> bool:
+	if _status == RunStatus.PLAYING:
+		return false
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		return touch_event.pressed
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		return mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		if not key_event.pressed or key_event.echo:
+			return false
+		return key_event.keycode == KEY_ENTER or key_event.keycode == KEY_KP_ENTER or key_event.keycode == KEY_SPACE or key_event.keycode == KEY_R
+	return false
 
 
 func _create_ui() -> void:
@@ -428,6 +464,10 @@ func _create_ui() -> void:
 	_danger_overlay = DangerOverlayScript.new()
 	_danger_overlay.name = "DangerOverlay"
 	_ui_layer.add_child(_danger_overlay)
+
+	_debug_overlay = DebugInterruptionOverlayScript.new()
+	_debug_overlay.name = "DebugInterruptionOverlay"
+	_ui_layer.add_child(_debug_overlay)
 
 
 func _create_audio() -> void:
@@ -464,6 +504,6 @@ func _update_ui() -> void:
 		RunStatus.PLAYING:
 			_message_label.text = ""
 		RunStatus.WON:
-			_message_label.text = "60秒生存成功\nRで再開"
+			_message_label.text = ""
 		RunStatus.LOST:
-			_message_label.text = "テスト失敗\nRで再開"
+			_message_label.text = "テスト失敗\nタップ / Rで再開"

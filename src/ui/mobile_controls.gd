@@ -45,6 +45,24 @@ func is_active() -> bool:
 	return _is_touch_capable
 
 
+func reset() -> void:
+	movement_vector = Vector2.ZERO
+	aim_direction = Vector2.RIGHT
+	shoot_pressed = false
+	dash_pressed = false
+	dash_just_pressed = false
+	_left_touch_id = -1
+	_right_touch_id = -1
+	_dash_touch_id = -1
+	_aim_strength = 0.0
+	_left_origin = Vector2.ZERO
+	_left_current = Vector2.ZERO
+	_right_origin = Vector2.ZERO
+	_right_current = Vector2.ZERO
+	if is_inside_tree():
+		queue_redraw()
+
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		_handle_screen_touch(event)

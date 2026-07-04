@@ -49,6 +49,14 @@ func run(context) -> void:
 	game._elapsed_seconds = game._run_duration_seconds
 	game._physics_process(0.0)
 	context.assert_equal(game.get_status(), 1, "制限時間まで生存すると WON になる")
+	context.assert_true(game.is_debug_interruption_showing(), "成功時にデバッグ割り込み画面が出る")
+
+	var restart_touch := InputEventScreenTouch.new()
+	restart_touch.pressed = true
+	restart_touch.position = Vector2(100.0, 100.0)
+	game._input(restart_touch)
+	context.assert_equal(game.get_status(), 0, "成功画面タップで新しいランへ戻る")
+	context.assert_true(not game.is_debug_interruption_showing(), "リスタート後はデバッグ割り込み画面が消える")
 
 	game.start_run(1842)
 	await context.process_frame
