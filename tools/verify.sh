@@ -25,10 +25,16 @@ if "$GODOT_BIN" --headless --log-file "$PROJECT_GODOT_LOG" --path "$PROJECT_ROOT
 else
 	PROJECT_STATUS="FAIL"
 fi
+if grep -E "SCRIPT ERROR|Parse Error|Compile Error|Invalid call|Invalid access|Node not found" "$PROJECT_LOG" >/dev/null 2>&1; then
+	PROJECT_STATUS="FAIL"
+fi
 
 if "$GODOT_BIN" --headless --log-file "$TEST_GODOT_LOG" --path "$PROJECT_ROOT" --script res://tests/test_runner.gd >"$TEST_LOG" 2>&1; then
 	TEST_STATUS="PASS"
 else
+	TEST_STATUS="FAIL"
+fi
+if grep -E "SCRIPT ERROR|Parse Error|Compile Error|Invalid call|Invalid access|Node not found" "$TEST_LOG" >/dev/null 2>&1; then
 	TEST_STATUS="FAIL"
 fi
 

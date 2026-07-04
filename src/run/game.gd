@@ -7,6 +7,8 @@ const PlayerScript := preload("res://src/actors/player/player.gd")
 const ChaserScript := preload("res://src/actors/enemies/chaser.gd")
 const ProjectileScript := preload("res://src/combat/projectile.gd")
 const MobileControlsScript := preload("res://src/ui/mobile_controls.gd")
+const FeedbackFxScript := preload("res://src/fx/feedback_fx.gd")
+const SoundBankScript := preload("res://src/fx/sound_bank.gd")
 
 enum RunStatus {
 	PLAYING,
@@ -34,10 +36,13 @@ var _status_label: Label
 var _message_label: Label
 var _warning_label: Label
 var _mobile_controls: Variant
+var _feedback_fx: Variant
+var _sound_bank: Variant
 
 
 func _ready() -> void:
 	_create_ui()
+	_create_audio()
 	start_run(default_seed)
 
 
@@ -74,6 +79,7 @@ func start_run(seed: int = default_seed) -> void:
 	_create_player()
 	for index in range(2):
 		_spawn_chaser()
+	_create_feedback_fx()
 	_update_ui()
 	queue_redraw()
 
@@ -136,6 +142,12 @@ func _clear_session() -> void:
 	_player = null
 	_rule_service = null
 	_snapshot = null
+	_feedback_fx = null
+
+
+func _exit_tree() -> void:
+	if _sound_bank != null and is_instance_valid(_sound_bank):
+		_sound_bank.clear_active()
 
 
 func _create_arena() -> void:
@@ -178,9 +190,16 @@ func _create_player() -> void:
 	_player.global_position = _arena_rect.get_center()
 	_player.configure(_snapshot, _mobile_controls)
 	_player.shoot_requested.connect(_on_player_shoot_requested)
+	_player.dash_started.connect(_on_player_dash_started)
 	_player.health_changed.connect(_on_player_health_changed)
 	_player.died.connect(_on_player_died)
 	_session_root.add_child(_player)
+
+
+func _create_feedback_fx() -> void:
+	_feedback_fx = FeedbackFxScript.new()
+	_feedback_fx.name = "FeedbackFx"
+	_session_root.add_child(_feedback_fx)
 
 
 func _spawn_chaser() -> void:
@@ -220,6 +239,17 @@ func _on_player_shoot_requested(origin: Vector2, direction: Vector2) -> void:
 		_snapshot.get_float("combat.projectile_lifetime", 1.4)
 	)
 	_session_root.add_child(projectile)
+	if _feedback_fx != null:
+		_feedback_fx.spawn_muzzle(origin, direction)
+	if _sound_bank != null:
+		_sound_bank.play("shoot")
+
+
+func _on_player_dash_started(origin: Vector2, direction: Vector2) -> void:
+	if _feedback_fx != null:
+		_feedback_fx.spawn_dash(origin, direction)
+	if _sound_bank != null:
+		_sound_bank.play("dash")
 
 
 func _on_player_health_changed(_current_health: int, _max_health: int) -> void:
@@ -228,11 +258,17 @@ func _on_player_health_changed(_current_health: int, _max_health: int) -> void:
 
 func _on_player_died() -> void:
 	_status = RunStatus.LOST
+	if _sound_bank != null:
+		_sound_bank.play("lost")
 	_update_ui()
 
 
 func _on_chaser_died(_chaser: Variant) -> void:
 	_kill_count += 1
+	if _feedback_fx != null and _chaser != null and is_instance_valid(_chaser):
+		_feedback_fx.spawn_death(_chaser.global_position)
+	if _sound_bank != null:
+		_sound_bank.play("death")
 
 
 func _resolve_projectile_enemy_hits() -> void:
@@ -249,6 +285,10 @@ func _resolve_projectile_enemy_hits() -> void:
 				continue
 			var chaser: Variant = chaser_node
 			if projectile.global_position.distance_to(chaser.global_position) <= chaser.hit_radius + 5.0:
+				if _feedback_fx != null:
+					_feedback_fx.spawn_hit(chaser.global_position)
+				if _sound_bank != null:
+					_sound_bank.play("hit")
 				chaser.apply_damage(projectile.damage)
 				projectile.expire()
 				break
@@ -276,7 +316,13 @@ func _resolve_enemy_contact() -> void:
 		var chaser: Variant = chaser_node
 		var contact_distance: float = _player.hit_radius + chaser.contact_radius
 		if chaser.can_contact_damage() and _player.global_position.distance_to(chaser.global_position) <= contact_distance:
+			var previous_health: int = _player.health
 			_player.take_damage(chaser.contact_damage)
+			if _player.health < previous_health:
+				if _feedback_fx != null:
+					_feedback_fx.spawn_damage(_player.global_position)
+				if _sound_bank != null:
+					_sound_bank.play("player_damage")
 			chaser.mark_contact_damage()
 
 
@@ -311,6 +357,8 @@ func _draw_instability_lines(anomaly: float) -> void:
 func _check_success() -> void:
 	if _elapsed_seconds >= _run_duration_seconds:
 		_status = RunStatus.WON
+		if _sound_bank != null:
+			_sound_bank.play("win")
 		_update_ui()
 
 
@@ -343,6 +391,12 @@ func _create_ui() -> void:
 	_mobile_controls = MobileControlsScript.new()
 	_mobile_controls.name = "MobileControls"
 	_ui_layer.add_child(_mobile_controls)
+
+
+func _create_audio() -> void:
+	_sound_bank = SoundBankScript.new()
+	_sound_bank.name = "SoundBank"
+	add_child(_sound_bank)
 
 
 func _update_ui() -> void:

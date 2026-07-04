@@ -2,6 +2,7 @@ class_name Player
 extends CharacterBody2D
 
 signal shoot_requested(origin: Vector2, direction: Vector2)
+signal dash_started(origin: Vector2, direction: Vector2)
 signal health_changed(current_health: int, max_health: int)
 signal died
 
@@ -81,14 +82,15 @@ func _update_dash(delta: float) -> void:
 	var input_vector: Vector2 = _read_movement_input()
 	var space_pressed: bool = Input.is_key_pressed(KEY_SPACE)
 	var mobile_dash_started: bool = mobile_controls != null and mobile_controls.dash_just_pressed
-	var dash_started: bool = (space_pressed and not _was_space_pressed or mobile_dash_started) and _dash_cooldown_remaining <= 0.0
+	var should_start_dash: bool = (space_pressed and not _was_space_pressed or mobile_dash_started) and _dash_cooldown_remaining <= 0.0
 	_was_space_pressed = space_pressed
-	if dash_started:
+	if should_start_dash:
 		_dash_direction = input_vector
 		if _dash_direction == Vector2.ZERO:
 			_dash_direction = _aim_direction
 		_dash_remaining = rules.get_float("player.dash_duration", 0.16)
 		_dash_cooldown_remaining = rules.get_float("player.dash_cooldown", 0.62)
+		dash_started.emit(global_position, _dash_direction)
 
 	if _dash_remaining > 0.0:
 		_dash_remaining = maxf(0.0, _dash_remaining - delta)

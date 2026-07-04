@@ -38,6 +38,13 @@ $TestExit = Invoke-LoggedCommand -LogPath $TestLog -Arguments @("--headless", "-
 
 $ProjectStatus = if ($ProjectExit -eq 0) { "PASS" } else { "FAIL" }
 $TestStatus = if ($TestExit -eq 0) { "PASS" } else { "FAIL" }
+$ErrorPattern = "SCRIPT ERROR|Parse Error|Compile Error|Invalid call|Invalid access|Node not found"
+if (Select-String -Path $ProjectLog -Pattern $ErrorPattern -Quiet) {
+    $ProjectStatus = "FAIL"
+}
+if (Select-String -Path $TestLog -Pattern $ErrorPattern -Quiet) {
+    $TestStatus = "FAIL"
+}
 $TestSummary = Select-String -Path $TestLog -Pattern "Assertions:" | Select-Object -First 1
 
 if ($ProjectStatus -eq "PASS" -and $TestStatus -eq "PASS") {

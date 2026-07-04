@@ -16,6 +16,7 @@ func run(context) -> void:
 	first_chaser.global_position = player.global_position + Vector2(player.hit_radius + first_chaser.contact_radius - 2.0, 0.0)
 	game._resolve_enemy_contact()
 	context.assert_true(player.health < starting_health, "Chaser の接触でプレイヤーの耐久が減る")
+	context.assert_true(game.get_session_root().get_node("FeedbackFx").active_count() > 0, "被弾時に視覚フィードバックが出る")
 
 	game.start_run(1842)
 	await context.process_frame
@@ -30,6 +31,7 @@ func run(context) -> void:
 	game._resolve_projectile_enemy_hits()
 	await context.process_frame
 	context.assert_true(not is_instance_valid(first_chaser), "弾の命中で Chaser を倒せる")
+	context.assert_true(game.get_session_root().get_node("FeedbackFx").active_count() > 0, "命中時に視覚フィードバックが出る")
 
 	game.start_run(1842)
 	await context.process_frame
