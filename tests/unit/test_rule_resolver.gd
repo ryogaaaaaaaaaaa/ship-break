@@ -17,8 +17,8 @@ func run(context) -> void:
 	var result: Variant = RuleResolverScript.resolve(base_state, patches)
 	context.assert_true(result.is_ok(), "有効なパッチはエラーなしで解決される")
 	context.assert_almost_equal(result.snapshot.get_float("player.movement_speed", 0.0), 300.0, 0.001, "SET が速度を置き換える")
-	context.assert_almost_equal(result.snapshot.get_float("player.dash_speed", 0.0), 800.0, 0.001, "ADD がダッシュ速度へ加算される")
-	context.assert_almost_equal(result.snapshot.get_float("player.attack_cooldown", 0.0), 0.1, 0.001, "MULTIPLY が攻撃間隔へ乗算される")
+	context.assert_almost_equal(result.snapshot.get_float("player.dash_speed", 0.0), 940.0, 0.001, "ADD がダッシュ速度へ加算される")
+	context.assert_almost_equal(result.snapshot.get_float("player.attack_cooldown", 0.0), 0.155, 0.001, "MULTIPLY が攻撃間隔へ乗算される")
 	context.assert_equal(result.snapshot.get_int("enemy.max_active", 0), 12, "整数値の SET が保持される")
 	context.assert_equal(result.snapshot.get_bool("debug.show_hitboxes", false), true, "ENABLE が bool を true にする")
 

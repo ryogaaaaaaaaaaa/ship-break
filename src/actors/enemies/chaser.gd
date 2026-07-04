@@ -6,18 +6,23 @@ signal died(chaser)
 var target: Node2D
 var health: int = 2
 var speed: float = 118.0
+var surge_distance: float = 230.0
+var surge_multiplier: float = 1.32
 var contact_damage: int = 1
 var contact_radius: float = 24.0
 var hit_radius: float = 18.0
 var contact_cooldown_seconds: float = 0.55
 var _contact_cooldown_remaining: float = 0.0
 var _hit_flash_remaining: float = 0.0
+var _surge_intensity: float = 0.0
 
 
 func configure(next_target: Node2D, rules: Variant) -> void:
 	target = next_target
 	speed = rules.get_float("enemy.chaser_speed", speed)
 	health = rules.get_int("enemy.chaser_health", health)
+	surge_distance = rules.get_float("enemy.chaser_surge_distance", surge_distance)
+	surge_multiplier = rules.get_float("enemy.chaser_surge_multiplier", surge_multiplier)
 	contact_damage = rules.get_int("enemy.contact_damage", contact_damage)
 
 
@@ -32,11 +37,14 @@ func _physics_process(delta: float) -> void:
 	if target != null and is_instance_valid(target):
 		var to_target: Vector2 = target.global_position - global_position
 		if to_target.length() > 1.0:
-			velocity = to_target.normalized() * speed
+			_surge_intensity = 1.0 - clampf(to_target.length() / surge_distance, 0.0, 1.0)
+			var active_speed: float = speed * lerpf(1.0, surge_multiplier, _surge_intensity)
+			velocity = to_target.normalized() * active_speed
 		else:
 			velocity = Vector2.ZERO
 	else:
 		velocity = Vector2.ZERO
+		_surge_intensity = 0.0
 	move_and_slide()
 	queue_redraw()
 
@@ -69,8 +77,12 @@ func _draw() -> void:
 	var body_color := Color(0.9, 0.18, 0.16)
 	if _hit_flash_remaining > 0.0:
 		body_color = Color(1.0, 0.82, 0.72)
+	else:
+		body_color = body_color.lerp(Color(1.0, 0.42, 0.18), _surge_intensity * 0.7)
 	draw_circle(Vector2.ZERO, hit_radius, body_color)
 	draw_circle(Vector2.ZERO, 6.0, Color(0.18, 0.02, 0.03))
+	if _surge_intensity > 0.05:
+		draw_arc(Vector2.ZERO, hit_radius + 5.0, 0.0, TAU, 24, Color(1.0, 0.45, 0.28, 0.42 * _surge_intensity), 2.0)
 	if target != null and is_instance_valid(target):
 		var aim: Vector2 = (target.global_position - global_position).normalized()
 		draw_line(Vector2.ZERO, aim * (hit_radius + 8.0), Color(1.0, 0.55, 0.44), 3.0)

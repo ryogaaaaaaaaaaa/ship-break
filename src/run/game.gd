@@ -32,6 +32,7 @@ var _spawn_points: Array[Vector2] = []
 var _ui_layer: CanvasLayer
 var _status_label: Label
 var _message_label: Label
+var _warning_label: Label
 var _mobile_controls: Variant
 
 
@@ -71,7 +72,7 @@ func start_run(seed: int = default_seed) -> void:
 
 	_create_arena()
 	_create_player()
-	for index in range(3):
+	for index in range(2):
 		_spawn_chaser()
 	_update_ui()
 	queue_redraw()
@@ -114,11 +115,17 @@ func _physics_process(delta: float) -> void:
 	_resolve_enemy_contact()
 	_check_success()
 	_update_ui()
+	queue_redraw()
 
 
 func _draw() -> void:
-	draw_rect(_arena_rect, Color(0.035, 0.043, 0.058), true)
-	draw_rect(_arena_rect, Color(0.18, 0.22, 0.28), false, 3.0)
+	var anomaly: float = get_anomaly_intensity()
+	var arena_color := Color(0.035, 0.043, 0.058).lerp(Color(0.08, 0.035, 0.045), anomaly)
+	var border_color := Color(0.18, 0.22, 0.28).lerp(Color(0.95, 0.24, 0.18), anomaly)
+	draw_rect(_arena_rect, arena_color, true)
+	draw_rect(_arena_rect, border_color, false, 3.0 + anomaly * 3.0)
+	if anomaly > 0.0:
+		_draw_instability_lines(anomaly)
 
 
 func _clear_session() -> void:
@@ -136,9 +143,11 @@ func _create_arena() -> void:
 	_create_wall(Vector2(640.0, 665.0), Vector2(1150.0, 30.0))
 	_create_wall(Vector2(65.0, 360.0), Vector2(30.0, 610.0))
 	_create_wall(Vector2(1215.0, 360.0), Vector2(30.0, 610.0))
-	_create_wall(Vector2(420.0, 290.0), Vector2(150.0, 34.0))
-	_create_wall(Vector2(860.0, 430.0), Vector2(150.0, 34.0))
-	_create_wall(Vector2(640.0, 360.0), Vector2(42.0, 150.0))
+	_create_wall(Vector2(360.0, 235.0), Vector2(230.0, 34.0))
+	_create_wall(Vector2(920.0, 485.0), Vector2(230.0, 34.0))
+	_create_wall(Vector2(520.0, 470.0), Vector2(36.0, 150.0))
+	_create_wall(Vector2(760.0, 250.0), Vector2(36.0, 150.0))
+	_create_wall(Vector2(640.0, 360.0), Vector2(150.0, 30.0))
 
 
 func _create_wall(center: Vector2, size: Vector2) -> void:
@@ -180,12 +189,18 @@ func _spawn_chaser() -> void:
 	var max_active: int = _snapshot.get_int("enemy.max_active", 24)
 	if get_tree().get_nodes_in_group("chaser").size() >= max_active:
 		return
-	var spawn_index: int = _rng.choose_index(_spawn_points.size())
+	var eligible_points: Array[Vector2] = []
+	for spawn_point in _spawn_points:
+		if spawn_point.distance_to(_player.global_position) >= 390.0:
+			eligible_points.append(spawn_point)
+	if eligible_points.is_empty():
+		eligible_points = _spawn_points.duplicate()
+	var spawn_index: int = _rng.choose_index(eligible_points.size())
 	if spawn_index < 0:
 		return
 	var chaser: Variant = ChaserScript.new()
 	chaser.name = "Chaser"
-	chaser.global_position = _spawn_points[spawn_index]
+	chaser.global_position = eligible_points[spawn_index]
 	chaser.configure(_player, _snapshot)
 	chaser.died.connect(_on_chaser_died)
 	_session_root.add_child(chaser)
@@ -197,7 +212,13 @@ func _on_player_shoot_requested(origin: Vector2, direction: Vector2) -> void:
 		return
 	var projectile: Variant = ProjectileScript.new()
 	projectile.name = "Projectile"
-	projectile.configure(origin, direction, _snapshot.get_float("player.projectile_speed", 680.0), 1)
+	projectile.configure(
+		origin,
+		direction,
+		_snapshot.get_float("player.projectile_speed", 680.0),
+		_snapshot.get_int("combat.projectile_damage", 1),
+		_snapshot.get_float("combat.projectile_lifetime", 1.4)
+	)
 	_session_root.add_child(projectile)
 
 
@@ -268,7 +289,23 @@ func _is_inside_wall(point: Vector2) -> bool:
 
 func _current_spawn_interval() -> float:
 	var progress: float = clampf(_elapsed_seconds / maxf(_run_duration_seconds, 1.0), 0.0, 1.0)
-	return lerpf(1.15, 0.42, progress)
+	return lerpf(1.85, 0.72, progress)
+
+
+func get_anomaly_intensity() -> float:
+	var warning_start: float = maxf(_run_duration_seconds - 10.0, 1.0)
+	if _elapsed_seconds <= warning_start:
+		return 0.0
+	return clampf((_elapsed_seconds - warning_start) / maxf(_run_duration_seconds - warning_start, 1.0), 0.0, 1.0)
+
+
+func _draw_instability_lines(anomaly: float) -> void:
+	var line_count: int = 5
+	for index in range(line_count):
+		var y_offset: float = fmod(_elapsed_seconds * (18.0 + index * 7.0) + index * 103.0, _arena_rect.size.y)
+		var start := Vector2(_arena_rect.position.x, _arena_rect.position.y + y_offset)
+		var end := Vector2(_arena_rect.end.x, start.y)
+		draw_line(start, end, Color(1.0, 0.2, 0.16, 0.08 + anomaly * 0.18), 1.0 + anomaly * 2.0)
 
 
 func _check_success() -> void:
@@ -298,6 +335,11 @@ func _create_ui() -> void:
 	_message_label.add_theme_font_size_override("font_size", 28)
 	_ui_layer.add_child(_message_label)
 
+	_warning_label = Label.new()
+	_warning_label.position = Vector2(24.0, 50.0)
+	_warning_label.add_theme_font_size_override("font_size", 18)
+	_ui_layer.add_child(_warning_label)
+
 	_mobile_controls = MobileControlsScript.new()
 	_mobile_controls.name = "MobileControls"
 	_ui_layer.add_child(_mobile_controls)
@@ -319,6 +361,12 @@ func _update_ui() -> void:
 		_kill_count,
 		default_seed,
 	]
+	if _warning_label != null:
+		var anomaly: float = get_anomaly_intensity()
+		if _status == RunStatus.PLAYING and anomaly > 0.0:
+			_warning_label.text = "BUILD INSTABILITY %.0f%%" % [anomaly * 100.0]
+		else:
+			_warning_label.text = ""
 	if _message_label == null:
 		return
 	match _status:

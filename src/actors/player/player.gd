@@ -17,6 +17,7 @@ var _dash_remaining: float = 0.0
 var _dash_direction: Vector2 = Vector2.RIGHT
 var _invulnerable_remaining: float = 0.0
 var _damage_flash_remaining: float = 0.0
+var _shot_feedback_remaining: float = 0.0
 var _was_space_pressed: bool = false
 
 
@@ -37,6 +38,7 @@ func _physics_process(delta: float) -> void:
 	_dash_cooldown_remaining = maxf(0.0, _dash_cooldown_remaining - delta)
 	_invulnerable_remaining = maxf(0.0, _invulnerable_remaining - delta)
 	_damage_flash_remaining = maxf(0.0, _damage_flash_remaining - delta)
+	_shot_feedback_remaining = maxf(0.0, _shot_feedback_remaining - delta)
 	_update_aim()
 	_update_dash(delta)
 	_update_fire()
@@ -100,6 +102,7 @@ func _update_fire() -> void:
 	var mobile_shooting: bool = mobile_controls != null and mobile_controls.shoot_pressed
 	if (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or mobile_shooting) and _attack_cooldown_remaining <= 0.0:
 		_attack_cooldown_remaining = rules.get_float("player.attack_cooldown", 0.20)
+		_shot_feedback_remaining = 0.07
 		shoot_requested.emit(global_position + _aim_direction * 22.0, _aim_direction)
 
 
@@ -126,6 +129,13 @@ func _draw() -> void:
 		body_color = Color(1.0, 1.0, 1.0)
 	draw_circle(Vector2.ZERO, hit_radius, body_color)
 	draw_circle(Vector2.ZERO, 6.0, Color(0.03, 0.12, 0.16))
-	draw_line(Vector2.ZERO, _aim_direction * 28.0, Color(0.72, 1.0, 1.0), 4.0)
+	var aim_length: float = 34.0
+	var aim_width: float = 4.0
+	var aim_color := Color(0.72, 1.0, 1.0)
+	if _shot_feedback_remaining > 0.0:
+		aim_length = 46.0
+		aim_width = 6.0
+		aim_color = Color(1.0, 0.96, 0.46)
+	draw_line(Vector2.ZERO, _aim_direction * aim_length, aim_color, aim_width)
 	if _dash_remaining > 0.0:
 		draw_arc(Vector2.ZERO, hit_radius + 5.0, 0.0, TAU, 24, Color(0.9, 1.0, 1.0), 3.0)

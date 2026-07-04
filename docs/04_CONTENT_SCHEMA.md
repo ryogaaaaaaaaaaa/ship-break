@@ -29,8 +29,12 @@
 - `enemy.max_active`
 - `enemy.chaser_speed`
 - `enemy.chaser_health`
+- `enemy.chaser_surge_distance`
+- `enemy.chaser_surge_multiplier`
 - `enemy.contact_damage`
 - `combat.max_projectiles`
+- `combat.projectile_damage`
+- `combat.projectile_lifetime`
 - `debug.show_hitboxes`
 - `run.duration_seconds`
 

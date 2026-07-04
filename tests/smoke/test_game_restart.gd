@@ -11,7 +11,8 @@ func run(context) -> void:
 	var first_root: Node2D = game.get_session_root()
 	context.assert_true(first_root != null and is_instance_valid(first_root), "起動時に session root が作られる")
 	context.assert_equal(game.get_status(), 0, "起動時の状態は PLAYING")
-	context.assert_equal(game.get_rule_snapshot().get_int("enemy.max_active", -1), 24, "ゲームが RuleSnapshot の敵上限を読める")
+	context.assert_equal(game.get_rule_snapshot().get_int("enemy.max_active", -1), 14, "ゲームが RuleSnapshot の敵上限を読める")
+	context.assert_equal(game.get_rule_snapshot().get_int("combat.projectile_damage", -1), 2, "ゲームが RuleSnapshot の弾ダメージを読める")
 
 	game.start_run(777)
 	await context.process_frame
@@ -25,7 +26,7 @@ func run(context) -> void:
 		game.start_run(777)
 		await context.process_frame
 	context.assert_true(game.count_session_children() > 0, "連続リスタート後も session root にゲーム要素がある")
-	context.assert_true(context.get_nodes_in_group("chaser").size() <= game.get_rule_snapshot().get_int("enemy.max_active", 24), "敵数は上限以下に収まる")
+	context.assert_true(context.get_nodes_in_group("chaser").size() <= game.get_rule_snapshot().get_int("enemy.max_active", 14), "敵数は上限以下に収まる")
 
 	game.queue_free()
 	await context.process_frame

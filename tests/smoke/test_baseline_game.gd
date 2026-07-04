@@ -44,5 +44,11 @@ func run(context) -> void:
 	game._physics_process(0.0)
 	context.assert_equal(game.get_status(), 1, "制限時間まで生存すると WON になる")
 
+	game.start_run(1842)
+	await context.process_frame
+	context.assert_almost_equal(game.get_anomaly_intensity(), 0.0, 0.001, "序盤は異常予兆が出ない")
+	game._elapsed_seconds = game._run_duration_seconds - 5.0
+	context.assert_true(game.get_anomaly_intensity() > 0.0, "終盤は異常予兆が出る")
+
 	game.queue_free()
 	await context.process_frame
