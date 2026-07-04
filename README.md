@@ -1,0 +1,93 @@
+# SHIP//BREAK
+
+**Every time you fix a bug, the game breaks into a different game.**
+
+SHIP//BREAK は、発売直前のゲームをテストしているプレイヤーが、発生するバグへの対応を選び、その選択で現在のランが別のゲームへ壊れていく 2D トップダウンアクション・ローグライトである。
+
+現在の第1マイルストーンでは、バグシステムそのものではなく、将来バグで壊すための「普通に遊べる60秒の基礎ゲーム」と、その基礎を検証できるリポジトリを作る。
+
+## 現在できること
+
+- Godot 4.6.2 でプロジェクトを起動できる。
+- プレイヤーが移動、照準、射撃、ダッシュできる。
+- Chaser 敵が出現し、プレイヤーへ近づく。
+- 敵はプレイヤーにダメージを与える。
+- プレイヤーは敵を倒せる。
+- プレイヤー死亡、60秒生存成功、リスタートに対応する。
+- `SeededRng` とルール解決基盤のテストがある。
+
+## 起動
+
+Godot が使える環境で、リポジトリルートから次を実行する。
+
+```sh
+godot --path .
+```
+
+操作:
+
+- `W/A/S/D` または矢印キー: 移動
+- マウス: 照準
+- 左クリック: 射撃
+- `Space`: ダッシュ
+- `R`: リスタート
+
+スマホ/Web 操作:
+
+- 左側の仮想スティック: 移動
+- 右側ドラッグ: 照準しながら射撃
+- 右下ボタン: ダッシュ
+
+## 検証
+
+Windows / PowerShell では次を実行する。
+
+```powershell
+./tools/verify.ps1
+```
+
+この macOS 作業環境では PowerShell が見つからないため、同じ内容を次で実行できる。
+
+```sh
+./tools/verify.sh
+```
+
+## Web 書き出し
+
+GitHub Pages に置く Web 版は次で作成する。
+
+```sh
+./tools/export_web.sh
+```
+
+出力先:
+
+```text
+build/web/
+```
+
+`build/web/` の中身を GitHub Pages の公開元に置くと、スマホブラウザから確認できる。
+
+Pages へ置くファイルだけをまとめたい場合は次を使う。
+
+```sh
+./tools/prepare_pages.sh
+```
+
+出力先:
+
+```text
+build/pages/
+```
+
+## 重要ドキュメント
+
+- `AGENTS.md`: Codex が守る開発方針
+- `docs/00_PRODUCT.md`: 商品としての核
+- `docs/01_MVP_CONTRACT.md`: MVP と現在のスコープ
+- `docs/02_ARCHITECTURE.md`: 依存方向とルール基盤
+- `docs/03_GAMEPLAY_RULES.md`: プレイヤー、敵、ラン、バグ仕様
+- `docs/04_CONTENT_SCHEMA.md`: 将来のデータ形式方針
+- `docs/06_TEST_MATRIX.md`: 検証方針
+- `docs/DECISIONS.md`: 意思決定
+- `docs/FAILURES.md`: 失敗記録
