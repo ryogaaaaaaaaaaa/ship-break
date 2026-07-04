@@ -18,6 +18,7 @@ func _ready() -> void:
 		"death": _make_tone(120.0, 58.0, 0.22, 0.42, 0.76),
 		"dash": _make_tone(260.0, 920.0, 0.12, 0.24, 0.12),
 		"danger": _make_tone(82.0, 96.0, 0.11, 0.20, 0.72),
+		"desync": _make_tone(520.0, 110.0, 0.24, 0.18, 0.35),
 		"player_damage": _make_tone(90.0, 42.0, 0.18, 0.45, 0.9),
 		"win": _make_tone(420.0, 760.0, 0.28, 0.26, 0.2),
 		"lost": _make_tone(180.0, 70.0, 0.32, 0.34, 0.66),

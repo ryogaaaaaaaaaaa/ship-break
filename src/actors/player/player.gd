@@ -8,6 +8,7 @@ signal died
 
 var rules: Variant
 var mobile_controls: Variant
+var time_scale_source: Variant
 var max_health: int = 5
 var health: int = 5
 var hit_radius: float = 16.0
@@ -22,9 +23,10 @@ var _shot_feedback_remaining: float = 0.0
 var _was_space_pressed: bool = false
 
 
-func configure(next_rules: Variant, next_mobile_controls: Variant = null) -> void:
+func configure(next_rules: Variant, next_mobile_controls: Variant = null, next_time_scale_source: Variant = null) -> void:
 	rules = next_rules
 	mobile_controls = next_mobile_controls
+	time_scale_source = next_time_scale_source
 	max_health = rules.get_int("player.max_health", max_health)
 	health = max_health
 
@@ -35,13 +37,15 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_attack_cooldown_remaining = maxf(0.0, _attack_cooldown_remaining - delta)
-	_dash_cooldown_remaining = maxf(0.0, _dash_cooldown_remaining - delta)
-	_invulnerable_remaining = maxf(0.0, _invulnerable_remaining - delta)
-	_damage_flash_remaining = maxf(0.0, _damage_flash_remaining - delta)
-	_shot_feedback_remaining = maxf(0.0, _shot_feedback_remaining - delta)
+	var time_scale: float = _get_time_scale()
+	var scaled_delta: float = delta * time_scale
+	_attack_cooldown_remaining = maxf(0.0, _attack_cooldown_remaining - scaled_delta)
+	_dash_cooldown_remaining = maxf(0.0, _dash_cooldown_remaining - scaled_delta)
+	_invulnerable_remaining = maxf(0.0, _invulnerable_remaining - scaled_delta)
+	_damage_flash_remaining = maxf(0.0, _damage_flash_remaining - scaled_delta)
+	_shot_feedback_remaining = maxf(0.0, _shot_feedback_remaining - scaled_delta)
 	_update_aim()
-	_update_dash(delta)
+	_update_dash(scaled_delta, time_scale)
 	_update_fire()
 	queue_redraw()
 
@@ -78,7 +82,7 @@ func _update_aim() -> void:
 		_aim_direction = to_mouse.normalized()
 
 
-func _update_dash(delta: float) -> void:
+func _update_dash(delta: float, time_scale: float) -> void:
 	var input_vector: Vector2 = _read_movement_input()
 	var space_pressed: bool = Input.is_key_pressed(KEY_SPACE)
 	var mobile_dash_started: bool = mobile_controls != null and mobile_controls.dash_just_pressed
@@ -94,9 +98,9 @@ func _update_dash(delta: float) -> void:
 
 	if _dash_remaining > 0.0:
 		_dash_remaining = maxf(0.0, _dash_remaining - delta)
-		velocity = _dash_direction.normalized() * rules.get_float("player.dash_speed", 760.0)
+		velocity = _dash_direction.normalized() * rules.get_float("player.dash_speed", 760.0) * time_scale
 	else:
-		velocity = input_vector * rules.get_float("player.movement_speed", 260.0)
+		velocity = input_vector * rules.get_float("player.movement_speed", 260.0) * time_scale
 	move_and_slide()
 
 
@@ -123,6 +127,12 @@ func _read_movement_input() -> Vector2:
 	if input_vector.length() > 1.0:
 		input_vector = input_vector.normalized()
 	return input_vector
+
+
+func _get_time_scale() -> float:
+	if time_scale_source != null and is_instance_valid(time_scale_source) and time_scale_source.has_method("get_world_time_scale"):
+		return time_scale_source.get_world_time_scale()
+	return 1.0
 
 
 func _draw() -> void:

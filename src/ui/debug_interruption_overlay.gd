@@ -17,10 +17,18 @@ func _ready() -> void:
 	_build_layout()
 
 
-func show_interruption(elapsed_seconds: float, kill_count: int, seed: int) -> void:
+func show_interruption(elapsed_seconds: float, kill_count: int, seed: int, time_desync_enabled: bool) -> void:
 	visible = true
 	set_process(true)
 	_summary_label.text = "RUN %.1fs / 撃破 %d / Seed %d" % [elapsed_seconds, kill_count, seed]
+	if time_desync_enabled:
+		_body_label.text = "TIME DESYNC は継続中です。\n次のランも、一定間隔で世界全体が短くスローになります。"
+		_slot_label.text = "FIX  未接続    WORKAROUND  継続中    EXPLOIT  未接続"
+		_restart_label.text = "タップ / クリック / Enter / Space / R で次のラン"
+	else:
+		_body_label.text = "TIME DESYNC を検出しました。\nWORKAROUND を接続すると、一定間隔で世界全体が短くスローになります。"
+		_slot_label.text = "FIX  未接続    WORKAROUND  接続可能    EXPLOIT  未接続"
+		_restart_label.text = "タップ / クリック / Enter / Space / R で WORKAROUND を適用"
 	_pulse_seconds = 0.0
 	queue_redraw()
 

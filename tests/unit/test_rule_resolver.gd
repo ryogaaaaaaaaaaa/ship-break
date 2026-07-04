@@ -13,6 +13,7 @@ func run(context) -> void:
 	patches.append(RulePatchScript.new("player.attack_cooldown", RulePatchScript.Operation.MULTIPLY, 0.5))
 	patches.append(RulePatchScript.new("enemy.max_active", RulePatchScript.Operation.SET, 12))
 	patches.append(RulePatchScript.new("debug.show_hitboxes", RulePatchScript.Operation.ENABLE, true))
+	patches.append(RulePatchScript.new("world.time_desync_enabled", RulePatchScript.Operation.ENABLE, true))
 
 	var result: Variant = RuleResolverScript.resolve(base_state, patches)
 	context.assert_true(result.is_ok(), "有効なパッチはエラーなしで解決される")
@@ -21,6 +22,7 @@ func run(context) -> void:
 	context.assert_almost_equal(result.snapshot.get_float("player.attack_cooldown", 0.0), 0.155, 0.001, "MULTIPLY が攻撃間隔へ乗算される")
 	context.assert_equal(result.snapshot.get_int("enemy.max_active", 0), 12, "整数値の SET が保持される")
 	context.assert_equal(result.snapshot.get_bool("debug.show_hitboxes", false), true, "ENABLE が bool を true にする")
+	context.assert_equal(result.snapshot.get_bool("world.time_desync_enabled", false), true, "TIME DESYNC の有効化パッチが適用される")
 
 	var disabled_patches: Array = []
 	disabled_patches.append(RulePatchScript.new("debug.show_hitboxes", RulePatchScript.Operation.ENABLE, true))

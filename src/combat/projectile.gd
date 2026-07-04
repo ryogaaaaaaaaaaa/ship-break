@@ -6,9 +6,10 @@ var speed: float = 680.0
 var damage: int = 1
 var lifetime_seconds: float = 1.4
 var is_expired: bool = false
+var time_scale_source: Variant
 
 
-func configure(start_position: Vector2, shot_direction: Vector2, shot_speed: float, shot_damage: int = 1, shot_lifetime: float = 1.4) -> void:
+func configure(start_position: Vector2, shot_direction: Vector2, shot_speed: float, shot_damage: int = 1, shot_lifetime: float = 1.4, next_time_scale_source: Variant = null) -> void:
 	global_position = start_position
 	direction = shot_direction.normalized()
 	if direction == Vector2.ZERO:
@@ -16,6 +17,7 @@ func configure(start_position: Vector2, shot_direction: Vector2, shot_speed: flo
 	speed = shot_speed
 	damage = shot_damage
 	lifetime_seconds = shot_lifetime
+	time_scale_source = next_time_scale_source
 
 
 func _ready() -> void:
@@ -25,8 +27,9 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if is_expired:
 		return
-	global_position += direction * speed * delta
-	lifetime_seconds -= delta
+	var scaled_delta: float = delta * _get_time_scale()
+	global_position += direction * speed * scaled_delta
+	lifetime_seconds -= scaled_delta
 	if lifetime_seconds <= 0.0:
 		expire()
 	queue_redraw()
@@ -37,6 +40,12 @@ func expire() -> void:
 		return
 	is_expired = true
 	queue_free()
+
+
+func _get_time_scale() -> float:
+	if time_scale_source != null and is_instance_valid(time_scale_source) and time_scale_source.has_method("get_world_time_scale"):
+		return time_scale_source.get_world_time_scale()
+	return 1.0
 
 
 func _draw() -> void:

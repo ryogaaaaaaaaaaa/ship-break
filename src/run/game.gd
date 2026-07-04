@@ -3,6 +3,7 @@ extends Node2D
 
 const SeededRngScript := preload("res://src/core/seeded_rng.gd")
 const RuleServiceScript := preload("res://src/rules/rule_service.gd")
+const RulePatchScript := preload("res://src/rules/rule_patch.gd")
 const PlayerScript := preload("res://src/actors/player/player.gd")
 const ChaserScript := preload("res://src/actors/enemies/chaser.gd")
 const ProjectileScript := preload("res://src/combat/projectile.gd")
@@ -43,6 +44,8 @@ var _debug_overlay: Variant
 var _feedback_fx: Variant
 var _sound_bank: Variant
 var _danger_sound_timer: float = 0.0
+var _desync_sound_was_active: bool = false
+var _time_desync_workaround_enabled: bool = false
 
 
 func _ready() -> void:
@@ -63,12 +66,14 @@ func start_run(seed: int = default_seed) -> void:
 	_rule_service.name = "RuleService"
 	_session_root.add_child(_rule_service)
 	_rule_service.reset_to_default()
+	_apply_active_rule_patches()
 	_snapshot = _rule_service.get_snapshot()
 
 	_elapsed_seconds = 0.0
 	_spawn_timer = 0.0
 	_kill_count = 0
 	_danger_sound_timer = 0.0
+	_desync_sound_was_active = false
 	_status = RunStatus.PLAYING
 	if _mobile_controls != null:
 		_mobile_controls.reset()
@@ -116,9 +121,39 @@ func is_debug_interruption_showing() -> bool:
 	return _debug_overlay != null and _debug_overlay.is_showing()
 
 
+func is_time_desync_workaround_enabled() -> bool:
+	return _time_desync_workaround_enabled
+
+
+func get_time_desync_intensity() -> float:
+	if _snapshot == null or not _snapshot.get_bool("world.time_desync_enabled", false):
+		return 0.0
+	var interval: float = maxf(_snapshot.get_float("world.time_desync_interval", 4.8), 0.1)
+	var duration: float = clampf(_snapshot.get_float("world.time_desync_duration", 1.1), 0.0, interval)
+	if duration <= 0.0:
+		return 0.0
+	var phase: float = fmod(maxf(_elapsed_seconds, 0.0), interval)
+	if phase > duration:
+		return 0.0
+	var ramp: float = minf(0.2, duration * 0.5)
+	if ramp <= 0.0:
+		return 1.0
+	var fade_in: float = clampf(phase / ramp, 0.0, 1.0)
+	var fade_out: float = clampf((duration - phase) / ramp, 0.0, 1.0)
+	return minf(fade_in, fade_out)
+
+
+func get_world_time_scale() -> float:
+	var intensity: float = get_time_desync_intensity()
+	if intensity <= 0.0:
+		return 1.0
+	var target_scale: float = clampf(_snapshot.get_float("world.time_desync_scale", 1.0), 0.05, 1.0)
+	return lerpf(1.0, target_scale, intensity)
+
+
 func _input(event: InputEvent) -> void:
 	if _is_end_restart_input(event):
-		start_run(default_seed)
+		_restart_from_end_state()
 		_restart_was_pressed = Input.is_key_pressed(KEY_R)
 		get_viewport().set_input_as_handled()
 
@@ -131,9 +166,10 @@ func _physics_process(delta: float) -> void:
 		_update_ui()
 		return
 
-	_elapsed_seconds += delta
+	var world_delta: float = delta * get_world_time_scale()
+	_elapsed_seconds += world_delta
 	_danger_sound_timer = maxf(0.0, _danger_sound_timer - delta)
-	_spawn_timer -= delta
+	_spawn_timer -= world_delta
 	if _spawn_timer <= 0.0:
 		_spawn_chaser()
 		_spawn_timer = _current_spawn_interval()
@@ -142,6 +178,7 @@ func _physics_process(delta: float) -> void:
 	_resolve_projectile_wall_hits()
 	_resolve_enemy_contact()
 	_update_danger_feedback()
+	_update_time_desync_feedback()
 	_check_success()
 	_update_ui()
 	queue_redraw()
@@ -149,12 +186,17 @@ func _physics_process(delta: float) -> void:
 
 func _draw() -> void:
 	var anomaly: float = get_anomaly_intensity()
+	var desync: float = get_time_desync_intensity()
 	var arena_color := Color(0.035, 0.043, 0.058).lerp(Color(0.08, 0.035, 0.045), anomaly)
 	var border_color := Color(0.18, 0.22, 0.28).lerp(Color(0.95, 0.24, 0.18), anomaly)
+	arena_color = arena_color.lerp(Color(0.025, 0.055, 0.075), desync * 0.75)
+	border_color = border_color.lerp(Color(0.32, 0.9, 1.0), desync)
 	draw_rect(_arena_rect, arena_color, true)
 	draw_rect(_arena_rect, border_color, false, 3.0 + anomaly * 3.0)
 	if anomaly > 0.0:
 		_draw_instability_lines(anomaly)
+	if desync > 0.0:
+		_draw_desync_lines(desync)
 
 
 func _clear_session() -> void:
@@ -211,7 +253,7 @@ func _create_player() -> void:
 	_player = PlayerScript.new()
 	_player.name = "Player"
 	_player.global_position = _arena_rect.get_center()
-	_player.configure(_snapshot, _mobile_controls)
+	_player.configure(_snapshot, _mobile_controls, self)
 	_player.shoot_requested.connect(_on_player_shoot_requested)
 	_player.dash_started.connect(_on_player_dash_started)
 	_player.health_changed.connect(_on_player_health_changed)
@@ -243,7 +285,7 @@ func _spawn_chaser() -> void:
 	var chaser: Variant = ChaserScript.new()
 	chaser.name = "Chaser"
 	chaser.global_position = eligible_points[spawn_index]
-	chaser.configure(_player, _snapshot)
+	chaser.configure(_player, _snapshot, self)
 	chaser.died.connect(_on_chaser_died)
 	_session_root.add_child(chaser)
 
@@ -259,7 +301,8 @@ func _on_player_shoot_requested(origin: Vector2, direction: Vector2) -> void:
 		direction,
 		_snapshot.get_float("player.projectile_speed", 680.0),
 		_snapshot.get_int("combat.projectile_damage", 1),
-		_snapshot.get_float("combat.projectile_lifetime", 1.4)
+		_snapshot.get_float("combat.projectile_lifetime", 1.4),
+		self
 	)
 	_session_root.add_child(projectile)
 	if _feedback_fx != null:
@@ -393,6 +436,13 @@ func _update_danger_feedback() -> void:
 		_danger_sound_timer = lerpf(0.58, 0.24, danger_intensity)
 
 
+func _update_time_desync_feedback() -> void:
+	var intensity: float = get_time_desync_intensity()
+	if _sound_bank != null and intensity >= 0.72 and not _desync_sound_was_active:
+		_sound_bank.play("desync")
+	_desync_sound_was_active = intensity > 0.05
+
+
 func _draw_instability_lines(anomaly: float) -> void:
 	var line_count: int = 5
 	for index in range(line_count):
@@ -400,6 +450,15 @@ func _draw_instability_lines(anomaly: float) -> void:
 		var start := Vector2(_arena_rect.position.x, _arena_rect.position.y + y_offset)
 		var end := Vector2(_arena_rect.end.x, start.y)
 		draw_line(start, end, Color(1.0, 0.2, 0.16, 0.08 + anomaly * 0.18), 1.0 + anomaly * 2.0)
+
+
+func _draw_desync_lines(desync: float) -> void:
+	var line_count: int = 7
+	for index in range(line_count):
+		var x_offset: float = fmod(_elapsed_seconds * (42.0 + index * 3.0) + index * 151.0, _arena_rect.size.x)
+		var start := Vector2(_arena_rect.position.x + x_offset, _arena_rect.position.y)
+		var end := start + Vector2(38.0 + desync * 48.0, _arena_rect.size.y)
+		draw_line(start, end, Color(0.35, 0.95, 1.0, 0.06 + desync * 0.16), 1.0 + desync * 2.0)
 
 
 func _check_success() -> void:
@@ -410,15 +469,29 @@ func _check_success() -> void:
 		if _danger_overlay != null:
 			_danger_overlay.set_danger_intensity(0.0)
 		if _debug_overlay != null:
-			_debug_overlay.show_interruption(_elapsed_seconds, _kill_count, default_seed)
+			_debug_overlay.show_interruption(_elapsed_seconds, _kill_count, default_seed, _time_desync_workaround_enabled)
 		_update_ui()
 
 
 func _handle_restart_input() -> void:
 	var restart_pressed: bool = Input.is_key_pressed(KEY_R)
 	if restart_pressed and not _restart_was_pressed:
-		start_run(default_seed)
+		if _status == RunStatus.PLAYING:
+			start_run(default_seed)
+		else:
+			_restart_from_end_state()
 	_restart_was_pressed = restart_pressed
+
+
+func _restart_from_end_state() -> void:
+	if _status == RunStatus.WON:
+		_time_desync_workaround_enabled = true
+	start_run(default_seed)
+
+
+func _apply_active_rule_patches() -> void:
+	if _time_desync_workaround_enabled:
+		_rule_service.add_patch(RulePatchScript.new("world.time_desync_enabled", RulePatchScript.Operation.ENABLE))
 
 
 func _is_end_restart_input(event: InputEvent) -> bool:
@@ -484,17 +557,24 @@ func _update_ui() -> void:
 	if _player != null and is_instance_valid(_player):
 		current_health = _player.health
 		max_health = _player.max_health
-	_status_label.text = "生存 %.1f / %.0f  耐久 %d/%d  撃破 %d  Seed %d" % [
+	var patch_label: String = ""
+	if _snapshot != null and _snapshot.get_bool("world.time_desync_enabled", false):
+		patch_label = "  Patch TIME DESYNC"
+	_status_label.text = "生存 %.1f / %.0f  耐久 %d/%d  撃破 %d  Seed %d%s" % [
 		_elapsed_seconds,
 		_run_duration_seconds,
 		current_health,
 		max_health,
 		_kill_count,
 		default_seed,
+		patch_label,
 	]
 	if _warning_label != null:
 		var anomaly: float = get_anomaly_intensity()
-		if _status == RunStatus.PLAYING and anomaly > 0.0:
+		var desync: float = get_time_desync_intensity()
+		if _status == RunStatus.PLAYING and desync > 0.05:
+			_warning_label.text = "TIME DESYNC %.0f%%" % [desync * 100.0]
+		elif _status == RunStatus.PLAYING and anomaly > 0.0:
 			_warning_label.text = "BUILD INSTABILITY %.0f%%" % [anomaly * 100.0]
 		else:
 			_warning_label.text = ""

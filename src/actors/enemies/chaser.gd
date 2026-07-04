@@ -4,6 +4,7 @@ extends CharacterBody2D
 signal died(chaser)
 
 var target: Node2D
+var time_scale_source: Variant
 var health: int = 2
 var speed: float = 118.0
 var surge_distance: float = 230.0
@@ -17,8 +18,9 @@ var _hit_flash_remaining: float = 0.0
 var _surge_intensity: float = 0.0
 
 
-func configure(next_target: Node2D, rules: Variant) -> void:
+func configure(next_target: Node2D, rules: Variant, next_time_scale_source: Variant = null) -> void:
 	target = next_target
+	time_scale_source = next_time_scale_source
 	speed = rules.get_float("enemy.chaser_speed", speed)
 	health = rules.get_int("enemy.chaser_health", health)
 	surge_distance = rules.get_float("enemy.chaser_surge_distance", surge_distance)
@@ -32,14 +34,16 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_contact_cooldown_remaining = maxf(0.0, _contact_cooldown_remaining - delta)
-	_hit_flash_remaining = maxf(0.0, _hit_flash_remaining - delta)
+	var time_scale: float = _get_time_scale()
+	var scaled_delta: float = delta * time_scale
+	_contact_cooldown_remaining = maxf(0.0, _contact_cooldown_remaining - scaled_delta)
+	_hit_flash_remaining = maxf(0.0, _hit_flash_remaining - scaled_delta)
 	if target != null and is_instance_valid(target):
 		var to_target: Vector2 = target.global_position - global_position
 		if to_target.length() > 1.0:
 			_surge_intensity = 1.0 - clampf(to_target.length() / surge_distance, 0.0, 1.0)
 			var active_speed: float = speed * lerpf(1.0, surge_multiplier, _surge_intensity)
-			velocity = to_target.normalized() * active_speed
+			velocity = to_target.normalized() * active_speed * time_scale
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -71,6 +75,12 @@ func _setup_collision() -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	add_child(collision)
+
+
+func _get_time_scale() -> float:
+	if time_scale_source != null and is_instance_valid(time_scale_source) and time_scale_source.has_method("get_world_time_scale"):
+		return time_scale_source.get_world_time_scale()
+	return 1.0
 
 
 func _draw() -> void:

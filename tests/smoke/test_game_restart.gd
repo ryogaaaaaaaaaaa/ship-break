@@ -13,6 +13,7 @@ func run(context) -> void:
 	context.assert_equal(game.get_status(), 0, "起動時の状態は PLAYING")
 	context.assert_equal(game.get_rule_snapshot().get_int("enemy.max_active", -1), 14, "ゲームが RuleSnapshot の敵上限を読める")
 	context.assert_equal(game.get_rule_snapshot().get_int("combat.projectile_damage", -1), 2, "ゲームが RuleSnapshot の弾ダメージを読める")
+	context.assert_equal(game.get_rule_snapshot().get_bool("world.time_desync_enabled", true), false, "初回起動時は TIME DESYNC が無効")
 	context.assert_true(first_root.has_node("FeedbackFx"), "起動時に視覚フィードバック層が作られる")
 	context.assert_true(game.has_node("SoundBank"), "起動時に音フィードバック層が作られる")
 	context.assert_true(game.get_node("Hud").has_node("DangerOverlay"), "起動時に危険表示レイヤーが作られる")

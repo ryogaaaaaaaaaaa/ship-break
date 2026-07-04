@@ -57,6 +57,11 @@ func run(context) -> void:
 	game._input(restart_touch)
 	context.assert_equal(game.get_status(), 0, "成功画面タップで新しいランへ戻る")
 	context.assert_true(not game.is_debug_interruption_showing(), "リスタート後はデバッグ割り込み画面が消える")
+	context.assert_true(game.is_time_desync_workaround_enabled(), "成功画面タップで TIME DESYNC WORKAROUND が有効になる")
+	context.assert_equal(game.get_rule_snapshot().get_bool("world.time_desync_enabled", false), true, "次のランへ TIME DESYNC のルールパッチが入る")
+	game._elapsed_seconds = 0.55
+	context.assert_true(game.get_time_desync_intensity() > 0.5, "TIME DESYNC の発生中は強度が上がる")
+	context.assert_true(game.get_world_time_scale() < 1.0, "TIME DESYNC 中は世界時間が遅くなる")
 
 	game.start_run(1842)
 	await context.process_frame
