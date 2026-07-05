@@ -43,6 +43,11 @@ func run(context) -> void:
 	player.take_damage(999)
 	await context.process_frame
 	context.assert_equal(game.get_status(), 2, "プレイヤーの耐久が0になると LOST になる")
+	var lost_touch := InputEventScreenTouch.new()
+	lost_touch.pressed = true
+	lost_touch.position = Vector2(100.0, 100.0)
+	game._input(lost_touch)
+	context.assert_equal(game.get_status(), 0, "失敗画面タップで新しいランへ戻る")
 
 	game.start_run(1842)
 	await context.process_frame
@@ -50,14 +55,19 @@ func run(context) -> void:
 	game._physics_process(0.0)
 	context.assert_equal(game.get_status(), 1, "制限時間まで生存すると WON になる")
 	context.assert_true(game.is_debug_interruption_showing(), "成功時にデバッグ割り込み画面が出る")
+	var debug_overlay: Variant = game.get_node("Hud").get_node("DebugInterruptionOverlay")
+	context.assert_true(debug_overlay.is_workaround_selectable(), "成功画面では WORKAROUND だけ選択できる")
 
 	var restart_touch := InputEventScreenTouch.new()
 	restart_touch.pressed = true
 	restart_touch.position = Vector2(100.0, 100.0)
 	game._input(restart_touch)
-	context.assert_equal(game.get_status(), 0, "成功画面タップで新しいランへ戻る")
+	context.assert_equal(game.get_status(), 1, "成功画面の背景タップだけでは WORKAROUND を適用しない")
+
+	debug_overlay.select_workaround()
+	context.assert_equal(game.get_status(), 0, "WORKAROUND 選択で新しいランへ戻る")
 	context.assert_true(not game.is_debug_interruption_showing(), "リスタート後はデバッグ割り込み画面が消える")
-	context.assert_true(game.is_time_desync_workaround_enabled(), "成功画面タップで TIME DESYNC WORKAROUND が有効になる")
+	context.assert_true(game.is_time_desync_workaround_enabled(), "WORKAROUND 選択で TIME DESYNC WORKAROUND が有効になる")
 	context.assert_equal(game.get_rule_snapshot().get_bool("world.time_desync_enabled", false), true, "次のランへ TIME DESYNC のルールパッチが入る")
 	game._elapsed_seconds = 0.55
 	context.assert_true(game.get_time_desync_intensity() > 0.5, "TIME DESYNC の発生中は強度が上がる")

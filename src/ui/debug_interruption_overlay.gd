@@ -1,10 +1,14 @@
 class_name DebugInterruptionOverlay
 extends Control
 
+signal workaround_selected
+
 var _title_label: Label
 var _summary_label: Label
 var _body_label: Label
-var _slot_label: Label
+var _fix_button: Button
+var _workaround_button: Button
+var _exploit_button: Button
 var _restart_label: Label
 var _pulse_seconds: float = 0.0
 
@@ -23,12 +27,17 @@ func show_interruption(elapsed_seconds: float, kill_count: int, seed: int, time_
 	_summary_label.text = "RUN %.1fs / 撃破 %d / Seed %d" % [elapsed_seconds, kill_count, seed]
 	if time_desync_enabled:
 		_body_label.text = "TIME DESYNC は継続中です。\n次のランも、一定間隔で世界全体が短くスローになります。"
-		_slot_label.text = "FIX  未接続    WORKAROUND  継続中    EXPLOIT  未接続"
-		_restart_label.text = "タップ / クリック / Enter / Space / R で次のラン"
+		_workaround_button.text = "WORKAROUND\n継続"
+		_restart_label.text = "WORKAROUND / Enter / Space / R で次のラン"
 	else:
 		_body_label.text = "TIME DESYNC を検出しました。\nWORKAROUND を接続すると、一定間隔で世界全体が短くスローになります。"
-		_slot_label.text = "FIX  未接続    WORKAROUND  接続可能    EXPLOIT  未接続"
-		_restart_label.text = "タップ / クリック / Enter / Space / R で WORKAROUND を適用"
+		_workaround_button.text = "WORKAROUND\n接続"
+		_restart_label.text = "WORKAROUND / Enter / Space / R で適用"
+	_fix_button.text = "FIX\nロック"
+	_exploit_button.text = "EXPLOIT\nロック"
+	_fix_button.disabled = true
+	_workaround_button.disabled = false
+	_exploit_button.disabled = true
 	_pulse_seconds = 0.0
 	queue_redraw()
 
@@ -41,6 +50,15 @@ func hide_interruption() -> void:
 
 func is_showing() -> bool:
 	return visible
+
+
+func is_workaround_selectable() -> bool:
+	return visible and _workaround_button != null and not _workaround_button.disabled
+
+
+func select_workaround() -> void:
+	if is_workaround_selectable():
+		workaround_selected.emit()
 
 
 func _process(delta: float) -> void:
@@ -115,13 +133,20 @@ func _build_layout() -> void:
 	_body_label.add_theme_color_override("font_color", Color(0.91, 0.95, 0.96))
 	stack.add_child(_body_label)
 
-	_slot_label = Label.new()
-	_slot_label.text = "FIX  未接続    WORKAROUND  未接続    EXPLOIT  未接続"
-	_slot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_slot_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_slot_label.add_theme_font_size_override("font_size", 18)
-	_slot_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.32))
-	stack.add_child(_slot_label)
+	var slot_row := HBoxContainer.new()
+	slot_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	slot_row.add_theme_constant_override("separation", 12)
+	stack.add_child(slot_row)
+
+	_fix_button = _create_slot_button()
+	slot_row.add_child(_fix_button)
+
+	_workaround_button = _create_slot_button()
+	_workaround_button.pressed.connect(_on_workaround_pressed)
+	slot_row.add_child(_workaround_button)
+
+	_exploit_button = _create_slot_button()
+	slot_row.add_child(_exploit_button)
 
 	_restart_label = Label.new()
 	_restart_label.text = "タップ / クリック / Enter / Space / R で再起動"
@@ -129,3 +154,17 @@ func _build_layout() -> void:
 	_restart_label.add_theme_font_size_override("font_size", 18)
 	_restart_label.add_theme_color_override("font_color", Color(0.74, 0.79, 0.83))
 	stack.add_child(_restart_label)
+
+
+func _create_slot_button() -> Button:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(205.0, 76.0)
+	button.add_theme_font_size_override("font_size", 17)
+	button.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.44, 0.49, 0.53))
+	button.focus_mode = Control.FOCUS_NONE
+	return button
+
+
+func _on_workaround_pressed() -> void:
+	select_workaround()

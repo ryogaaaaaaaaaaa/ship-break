@@ -489,6 +489,13 @@ func _restart_from_end_state() -> void:
 	start_run(default_seed)
 
 
+func _on_debug_workaround_selected() -> void:
+	if _status != RunStatus.WON:
+		return
+	_time_desync_workaround_enabled = true
+	start_run(default_seed)
+
+
 func _apply_active_rule_patches() -> void:
 	if _time_desync_workaround_enabled:
 		_rule_service.add_patch(RulePatchScript.new("world.time_desync_enabled", RulePatchScript.Operation.ENABLE))
@@ -499,10 +506,10 @@ func _is_end_restart_input(event: InputEvent) -> bool:
 		return false
 	if event is InputEventScreenTouch:
 		var touch_event := event as InputEventScreenTouch
-		return touch_event.pressed
+		return _status == RunStatus.LOST and touch_event.pressed
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
-		return mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT
+		return _status == RunStatus.LOST and mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
 		if not key_event.pressed or key_event.echo:
@@ -540,6 +547,7 @@ func _create_ui() -> void:
 
 	_debug_overlay = DebugInterruptionOverlayScript.new()
 	_debug_overlay.name = "DebugInterruptionOverlay"
+	_debug_overlay.workaround_selected.connect(_on_debug_workaround_selected)
 	_ui_layer.add_child(_debug_overlay)
 
 

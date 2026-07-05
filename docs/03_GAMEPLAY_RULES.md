@@ -28,8 +28,8 @@ Chaser:
 - 時間経過で敵スポーン間隔が短くなる。
 - 終盤10秒に `BUILD INSTABILITY` の予兆が出る。
 - 60秒生存成功時は `BUILD INTERRUPTED` のデバッグ割り込み画面を表示する。
-- 初回成功後の再起動入力で、`TIME DESYNC` の `WORKAROUND` が有効になる。
-- 現時点では `TIME DESYNC WORKAROUND` 1本だけを接続する。`FIX` と `EXPLOIT` は未接続。
+- 初回成功後の選択UIで `WORKAROUND` を選ぶと、`TIME DESYNC` の `WORKAROUND` が有効になる。
+- 現時点では `TIME DESYNC WORKAROUND` 1本だけを選択可能にする。`FIX` と `EXPLOIT` はロック表示。
 - `TIME DESYNC WORKAROUND` が有効なランでは、一定間隔で世界全体が短くスローになる。
 - スロー中はプレイヤー、敵、弾、スポーン、ラン時間の進み方が同じ係数で遅くなる。
 
@@ -44,6 +44,7 @@ Chaser:
 - スマホの右側ドラッグ中は照準線が伸び、射撃方向を読みやすくする。
 - 成功時は通常の勝利文だけで終わらず、ゲームがデバッグ画面へ割り込まれたように見せる。
 - `TIME DESYNC` 中は画面が青く乱れ、`TIME DESYNC` 表示と下降音で世界の遅れを伝える。
+- 成功画面の背景タップだけでは `WORKAROUND` を適用しない。適用は `WORKAROUND` 枠、または `Enter` / `Space` / `R` のショートカットで行う。
 - これらは仮演出であり、最終サウンド/アートではない。
 
 ## MVP の将来ラン構造
