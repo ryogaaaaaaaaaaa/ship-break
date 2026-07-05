@@ -29,8 +29,9 @@
 
 影響:
 
-- 現在は `FIX` / `WORKAROUND` / `EXPLOIT` を実装しない。
-- `TEST RUNNER` も作らない。
+- 当初は `FIX` / `WORKAROUND` / `EXPLOIT` を実装しない方針で通常ゲームを先に作った。
+- その後、`TIME DESYNC` だけは3択まで接続済み。
+- `TEST RUNNER` はまだ作らない。
 - ルール基盤は小さく、本当に使う値だけから始める。
 
 ## 0003: PowerShell 検証入口と macOS 補助入口を併置する

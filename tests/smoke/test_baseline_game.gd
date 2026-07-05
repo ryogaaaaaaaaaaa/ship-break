@@ -56,7 +56,9 @@ func run(context) -> void:
 	context.assert_equal(game.get_status(), 1, "制限時間まで生存すると WON になる")
 	context.assert_true(game.is_debug_interruption_showing(), "成功時にデバッグ割り込み画面が出る")
 	var debug_overlay: Variant = game.get_node("Hud").get_node("DebugInterruptionOverlay")
-	context.assert_true(debug_overlay.is_workaround_selectable(), "成功画面では WORKAROUND だけ選択できる")
+	context.assert_true(debug_overlay.is_fix_selectable(), "成功画面では FIX を選択できる")
+	context.assert_true(debug_overlay.is_workaround_selectable(), "成功画面では WORKAROUND を選択できる")
+	context.assert_true(debug_overlay.is_exploit_selectable(), "成功画面では EXPLOIT を選択できる")
 
 	var restart_touch := InputEventScreenTouch.new()
 	restart_touch.pressed = true
@@ -72,6 +74,28 @@ func run(context) -> void:
 	game._elapsed_seconds = 0.55
 	context.assert_true(game.get_time_desync_intensity() > 0.5, "TIME DESYNC の発生中は強度が上がる")
 	context.assert_true(game.get_world_time_scale() < 1.0, "TIME DESYNC 中は世界時間が遅くなる")
+	context.assert_almost_equal(game.get_player_time_scale(), game.get_world_time_scale(), 0.001, "WORKAROUND 中はプレイヤーも世界時間に従う")
+
+	game._elapsed_seconds = game._run_duration_seconds
+	game._physics_process(0.0)
+	debug_overlay.select_exploit()
+	context.assert_equal(game.get_status(), 0, "EXPLOIT 選択で新しいランへ戻る")
+	context.assert_true(game.is_time_desync_exploit_enabled(), "EXPLOIT 選択で TIME DESYNC EXPLOIT が有効になる")
+	context.assert_equal(game.get_rule_snapshot().get_bool("world.time_desync_enabled", false), true, "EXPLOIT でも TIME DESYNC は有効")
+	context.assert_equal(game.get_rule_snapshot().get_bool("world.time_desync_player_exempt", false), true, "EXPLOIT はプレイヤーをスローから除外する")
+	game._elapsed_seconds = 0.55
+	context.assert_true(game.get_world_time_scale() < 1.0, "EXPLOIT 中も世界時間は遅くなる")
+	context.assert_almost_equal(game.get_player_time_scale(), 1.0, 0.001, "EXPLOIT 中はプレイヤーだけ通常速度になる")
+
+	game._elapsed_seconds = game._run_duration_seconds
+	game._physics_process(0.0)
+	debug_overlay.select_fix()
+	context.assert_equal(game.get_status(), 0, "FIX 選択で新しいランへ戻る")
+	context.assert_true(not game.is_time_desync_workaround_enabled(), "FIX 選択で WORKAROUND は解除される")
+	context.assert_true(not game.is_time_desync_exploit_enabled(), "FIX 選択で EXPLOIT は解除される")
+	context.assert_equal(game.get_rule_snapshot().get_bool("world.time_desync_enabled", true), false, "FIX 後は TIME DESYNC のルールパッチが入らない")
+	context.assert_almost_equal(game.get_world_time_scale(), 1.0, 0.001, "FIX 後は世界時間が通常に戻る")
+	context.assert_almost_equal(game.get_player_time_scale(), 1.0, 0.001, "FIX 後はプレイヤー時間も通常に戻る")
 
 	game.start_run(1842)
 	await context.process_frame

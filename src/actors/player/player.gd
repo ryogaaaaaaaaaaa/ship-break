@@ -130,8 +130,8 @@ func _read_movement_input() -> Vector2:
 
 
 func _get_time_scale() -> float:
-	if time_scale_source != null and is_instance_valid(time_scale_source) and time_scale_source.has_method("get_world_time_scale"):
-		return time_scale_source.get_world_time_scale()
+	if time_scale_source != null and is_instance_valid(time_scale_source) and time_scale_source.has_method("get_player_time_scale"):
+		return time_scale_source.get_player_time_scale()
 	return 1.0
 
 

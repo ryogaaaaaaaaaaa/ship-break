@@ -1,7 +1,13 @@
 class_name DebugInterruptionOverlay
 extends Control
 
+signal fix_selected
 signal workaround_selected
+signal exploit_selected
+
+const TIME_DESYNC_FIX := 0
+const TIME_DESYNC_WORKAROUND := 1
+const TIME_DESYNC_EXPLOIT := 2
 
 var _title_label: Label
 var _summary_label: Label
@@ -21,23 +27,24 @@ func _ready() -> void:
 	_build_layout()
 
 
-func show_interruption(elapsed_seconds: float, kill_count: int, seed: int, time_desync_enabled: bool) -> void:
+func show_interruption(elapsed_seconds: float, kill_count: int, seed: int, time_desync_mode: int) -> void:
 	visible = true
 	set_process(true)
 	_summary_label.text = "RUN %.1fs / 撃破 %d / Seed %d" % [elapsed_seconds, kill_count, seed]
-	if time_desync_enabled:
-		_body_label.text = "TIME DESYNC は継続中です。\n次のランも、一定間隔で世界全体が短くスローになります。"
-		_workaround_button.text = "WORKAROUND\n継続"
-		_restart_label.text = "WORKAROUND / Enter / Space / R で次のラン"
-	else:
-		_body_label.text = "TIME DESYNC を検出しました。\nWORKAROUND を接続すると、一定間隔で世界全体が短くスローになります。"
-		_workaround_button.text = "WORKAROUND\n接続"
-		_restart_label.text = "WORKAROUND / Enter / Space / R で適用"
-	_fix_button.text = "FIX\nロック"
-	_exploit_button.text = "EXPLOIT\nロック"
-	_fix_button.disabled = true
+	match time_desync_mode:
+		TIME_DESYNC_WORKAROUND:
+			_body_label.text = "TIME DESYNC は継続中です。\n次の処置を選んで、ランの壊れ方を変えます。"
+		TIME_DESYNC_EXPLOIT:
+			_body_label.text = "EXPLOIT が走っています。\nプレイヤーだけ通常速度のまま、世界側が短くスローになります。"
+		_:
+			_body_label.text = "TIME DESYNC を検出しました。\n処置を選ぶと、次のランの時間挙動が変わります。"
+	_fix_button.text = "FIX\n通常時間"
+	_workaround_button.text = "WORKAROUND\n全体スロー"
+	_exploit_button.text = "EXPLOIT\n自分だけ通常"
+	_restart_label.text = "FIX / WORKAROUND / EXPLOIT から選択"
+	_fix_button.disabled = false
 	_workaround_button.disabled = false
-	_exploit_button.disabled = true
+	_exploit_button.disabled = false
 	_pulse_seconds = 0.0
 	queue_redraw()
 
@@ -56,9 +63,27 @@ func is_workaround_selectable() -> bool:
 	return visible and _workaround_button != null and not _workaround_button.disabled
 
 
+func is_fix_selectable() -> bool:
+	return visible and _fix_button != null and not _fix_button.disabled
+
+
+func is_exploit_selectable() -> bool:
+	return visible and _exploit_button != null and not _exploit_button.disabled
+
+
+func select_fix() -> void:
+	if is_fix_selectable():
+		fix_selected.emit()
+
+
 func select_workaround() -> void:
 	if is_workaround_selectable():
 		workaround_selected.emit()
+
+
+func select_exploit() -> void:
+	if is_exploit_selectable():
+		exploit_selected.emit()
 
 
 func _process(delta: float) -> void:
@@ -139,6 +164,7 @@ func _build_layout() -> void:
 	stack.add_child(slot_row)
 
 	_fix_button = _create_slot_button()
+	_fix_button.pressed.connect(_on_fix_pressed)
 	slot_row.add_child(_fix_button)
 
 	_workaround_button = _create_slot_button()
@@ -146,6 +172,7 @@ func _build_layout() -> void:
 	slot_row.add_child(_workaround_button)
 
 	_exploit_button = _create_slot_button()
+	_exploit_button.pressed.connect(_on_exploit_pressed)
 	slot_row.add_child(_exploit_button)
 
 	_restart_label = Label.new()
@@ -168,3 +195,11 @@ func _create_slot_button() -> Button:
 
 func _on_workaround_pressed() -> void:
 	select_workaround()
+
+
+func _on_fix_pressed() -> void:
+	select_fix()
+
+
+func _on_exploit_pressed() -> void:
+	select_exploit()

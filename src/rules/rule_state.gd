@@ -40,6 +40,7 @@ static func default_values() -> Dictionary:
 		},
 		"world": {
 			"time_desync_enabled": false,
+			"time_desync_player_exempt": false,
 			"time_desync_interval": 4.8,
 			"time_desync_duration": 1.1,
 			"time_desync_scale": 0.38,

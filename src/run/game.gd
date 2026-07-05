@@ -19,6 +19,12 @@ enum RunStatus {
 	LOST,
 }
 
+enum TimeDesyncMode {
+	FIX,
+	WORKAROUND,
+	EXPLOIT,
+}
+
 var default_seed: int = 1842
 var _rng: Variant
 var _rule_service: Variant
@@ -45,7 +51,7 @@ var _feedback_fx: Variant
 var _sound_bank: Variant
 var _danger_sound_timer: float = 0.0
 var _desync_sound_was_active: bool = false
-var _time_desync_workaround_enabled: bool = false
+var _time_desync_mode: int = TimeDesyncMode.FIX
 
 
 func _ready() -> void:
@@ -122,7 +128,11 @@ func is_debug_interruption_showing() -> bool:
 
 
 func is_time_desync_workaround_enabled() -> bool:
-	return _time_desync_workaround_enabled
+	return _time_desync_mode == TimeDesyncMode.WORKAROUND
+
+
+func is_time_desync_exploit_enabled() -> bool:
+	return _time_desync_mode == TimeDesyncMode.EXPLOIT
 
 
 func get_time_desync_intensity() -> float:
@@ -149,6 +159,12 @@ func get_world_time_scale() -> float:
 		return 1.0
 	var target_scale: float = clampf(_snapshot.get_float("world.time_desync_scale", 1.0), 0.05, 1.0)
 	return lerpf(1.0, target_scale, intensity)
+
+
+func get_player_time_scale() -> float:
+	if _snapshot != null and _snapshot.get_bool("world.time_desync_player_exempt", false):
+		return 1.0
+	return get_world_time_scale()
 
 
 func _input(event: InputEvent) -> void:
@@ -469,36 +485,47 @@ func _check_success() -> void:
 		if _danger_overlay != null:
 			_danger_overlay.set_danger_intensity(0.0)
 		if _debug_overlay != null:
-			_debug_overlay.show_interruption(_elapsed_seconds, _kill_count, default_seed, _time_desync_workaround_enabled)
+			_debug_overlay.show_interruption(_elapsed_seconds, _kill_count, default_seed, _time_desync_mode)
 		_update_ui()
 
 
 func _handle_restart_input() -> void:
 	var restart_pressed: bool = Input.is_key_pressed(KEY_R)
 	if restart_pressed and not _restart_was_pressed:
-		if _status == RunStatus.PLAYING:
+		if _status == RunStatus.PLAYING or _status == RunStatus.LOST:
 			start_run(default_seed)
-		else:
-			_restart_from_end_state()
 	_restart_was_pressed = restart_pressed
 
 
 func _restart_from_end_state() -> void:
-	if _status == RunStatus.WON:
-		_time_desync_workaround_enabled = true
 	start_run(default_seed)
 
 
+func _on_debug_fix_selected() -> void:
+	if _status == RunStatus.WON:
+		_apply_time_desync_choice(TimeDesyncMode.FIX)
+
+
 func _on_debug_workaround_selected() -> void:
-	if _status != RunStatus.WON:
-		return
-	_time_desync_workaround_enabled = true
+	if _status == RunStatus.WON:
+		_apply_time_desync_choice(TimeDesyncMode.WORKAROUND)
+
+
+func _on_debug_exploit_selected() -> void:
+	if _status == RunStatus.WON:
+		_apply_time_desync_choice(TimeDesyncMode.EXPLOIT)
+
+
+func _apply_time_desync_choice(mode: int) -> void:
+	_time_desync_mode = mode
 	start_run(default_seed)
 
 
 func _apply_active_rule_patches() -> void:
-	if _time_desync_workaround_enabled:
+	if _time_desync_mode == TimeDesyncMode.WORKAROUND or _time_desync_mode == TimeDesyncMode.EXPLOIT:
 		_rule_service.add_patch(RulePatchScript.new("world.time_desync_enabled", RulePatchScript.Operation.ENABLE))
+	if _time_desync_mode == TimeDesyncMode.EXPLOIT:
+		_rule_service.add_patch(RulePatchScript.new("world.time_desync_player_exempt", RulePatchScript.Operation.ENABLE))
 
 
 func _is_end_restart_input(event: InputEvent) -> bool:
@@ -514,7 +541,7 @@ func _is_end_restart_input(event: InputEvent) -> bool:
 		var key_event := event as InputEventKey
 		if not key_event.pressed or key_event.echo:
 			return false
-		return key_event.keycode == KEY_ENTER or key_event.keycode == KEY_KP_ENTER or key_event.keycode == KEY_SPACE or key_event.keycode == KEY_R
+		return _status == RunStatus.LOST and (key_event.keycode == KEY_ENTER or key_event.keycode == KEY_KP_ENTER or key_event.keycode == KEY_SPACE or key_event.keycode == KEY_R)
 	return false
 
 
@@ -547,7 +574,9 @@ func _create_ui() -> void:
 
 	_debug_overlay = DebugInterruptionOverlayScript.new()
 	_debug_overlay.name = "DebugInterruptionOverlay"
+	_debug_overlay.fix_selected.connect(_on_debug_fix_selected)
 	_debug_overlay.workaround_selected.connect(_on_debug_workaround_selected)
+	_debug_overlay.exploit_selected.connect(_on_debug_exploit_selected)
 	_ui_layer.add_child(_debug_overlay)
 
 
@@ -567,7 +596,10 @@ func _update_ui() -> void:
 		max_health = _player.max_health
 	var patch_label: String = ""
 	if _snapshot != null and _snapshot.get_bool("world.time_desync_enabled", false):
-		patch_label = "  Patch TIME DESYNC"
+		if _snapshot.get_bool("world.time_desync_player_exempt", false):
+			patch_label = "  Patch TIME DESYNC EXPLOIT"
+		else:
+			patch_label = "  Patch TIME DESYNC WORKAROUND"
 	_status_label.text = "生存 %.1f / %.0f  耐久 %d/%d  撃破 %d  Seed %d%s" % [
 		_elapsed_seconds,
 		_run_duration_seconds,
